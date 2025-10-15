@@ -1,0 +1,154 @@
+// Google Apps Script Code - Copy this to script.google.com
+
+function doPost(e) {
+  try {
+    // Parse the incoming data
+    const data = JSON.parse(e.postData.contents);
+    
+    // Get the active spreadsheet (or create new one)
+    let sheet = getOrCreateSheet();
+    
+    // Add headers if this is the first entry
+    if (sheet.getLastRow() === 0) {
+      addHeaders(sheet);
+    }
+    
+    // Add the review data
+    addReviewData(sheet, data);
+    
+    // Return success response
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        status: 'success',
+        message: 'Review submitted successfully',
+        rowNumber: sheet.getLastRow()
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (error) {
+    // Return error response
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        status: 'error',
+        message: error.toString()
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getOrCreateSheet() {
+  // Try to get existing spreadsheet by name, or create new one
+  let spreadsheet;
+  const files = DriveApp.getFilesByName('Trip Reviews Database');
+  
+  if (files.hasNext()) {
+    // Use existing spreadsheet
+    spreadsheet = SpreadsheetApp.open(files.next());
+  } else {
+    // Create new spreadsheet
+    spreadsheet = SpreadsheetApp.create('Trip Reviews Database');
+  }
+  
+  let sheet = spreadsheet.getActiveSheet();
+  sheet.setName('Reviews');
+  return sheet;
+}
+
+function addHeaders(sheet) {
+  const headers = [
+    'Submission Date',
+    'Employee ID',
+    'Employee Name', 
+    'Bus Number',
+    'Room Number',
+    'Overall Rating',
+    'Overall Text',
+    'Resort Rating',
+    'Resort Text',
+    'Vendor Rating', 
+    'Vendor Text',
+    'Committee Rating',
+    'Committee Text',
+    'Comments',
+    'Timestamp',
+    'IP Address'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  
+  // Format headers
+  sheet.getRange(1, 1, 1, headers.length)
+    .setBackground('#4285F4')
+    .setFontColor('white')
+    .setFontWeight('bold');
+    
+  // Auto-resize columns
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function addReviewData(sheet, data) {
+  const getRatingText = (value) => {
+    const texts = {
+      1: 'Fair',
+      2: 'Good', 
+      3: 'Great',
+      4: 'Excellent'
+    };
+    return texts[value] || 'Not Rated';
+  };
+  
+  const row = [
+    new Date(), // Submission Date
+    data.employee.EmployeeID,
+    data.employee.Name,
+    data.employee.BusNumber,
+    data.employee.RoomNumber,
+    data.ratings.overall,
+    getRatingText(data.ratings.overall),
+    data.ratings.resort,
+    getRatingText(data.ratings.resort),
+    data.ratings.vendor,
+    getRatingText(data.ratings.vendor),
+    data.ratings.committee,
+    getRatingText(data.ratings.committee),
+    data.comments || '',
+    data.timestamp,
+    data.ipAddress || 'Unknown'
+  ];
+  
+  sheet.appendRow(row);
+  
+  // Format the new row
+  const lastRow = sheet.getLastRow();
+  sheet.getRange(lastRow, 1, 1, row.length)
+    .setBorder(true, true, true, true, true, true);
+}
+
+// Test function (optional)
+function testScript() {
+  const testData = {
+    employee: {
+      EmployeeID: 'TEST001',
+      Name: 'Test User',
+      BusNumber: 'B1',
+      RoomNumber: '101'
+    },
+    ratings: {
+      overall: 4,
+      resort: 3,
+      vendor: 4,
+      committee: 3
+    },
+    timestamp: new Date().toISOString(),
+    comments: 'Test submission'
+  };
+  
+  const mockEvent = {
+    postData: {
+      contents: JSON.stringify(testData)
+    }
+  };
+  
+  const result = doPost(mockEvent);
+  console.log(result.getContent());
+}
